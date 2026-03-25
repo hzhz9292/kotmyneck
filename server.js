@@ -14,98 +14,119 @@ app.use(express.static(path.join(__dirname, 'public')));
 const PORT = process.env.PORT || 3000;
 
 const CONFIG = {
-  width: 1280,
-  height: 720,
-  goalHeight: 210,
-  malletRadius: 48,
-  puckRadius: 22,
+  width: 1200,
+  height: 700,
+
+  goalHeight: 230,
+
+  malletRadius: 62,
+  puckRadius: 28,
+
   maxScore: 5,
 
-  tickRate: 1000 / 60,
-  resetDelayMs: 850,
+  tickRateMs: 1000 / 120,
+  resetDelayMs: 900,
 
-  puckFrictionPerFrame: 0.996,
-  wallBounce: 0.98,
-  maxPuckSpeed: 1220,
-  serveSpeedMin: 560,
-  serveSpeedMax: 760
+  friction: 0.997,
+  wallBounce: 0.985,
+  malletBounce: 1.04,
+
+  serveSpeedMin: 620,
+  serveSpeedMax: 820,
+  maxPuckSpeed: 1250,
+  minPuckSpeed: 120,
+
+  collisionSubsteps: 5
 };
 
-let waitingPlayer = null;
+let waitingSocket = null;
 const matches = new Map();
-const socketToMatch = new Map();
+const socketToRoom = new Map();
 
-function clamp(v, a, b) {
-  return Math.max(a, Math.min(b, v));
-}
-
-function len(x, y) {
-  return Math.hypot(x, y);
+function clamp(v, min, max) {
+  return Math.max(min, Math.min(max, v));
 }
 
 function rand(min, max) {
   return Math.random() * (max - min) + min;
 }
 
+function len(x, y) {
+  return Math.hypot(x, y);
+}
+
+function norm(x, y) {
+  const d = Math.hypot(x, y) || 1;
+  return { x: x / d, y: y / d };
+}
+
 function makeMallet(side) {
-  const x = side === 'left' ? CONFIG.width * 0.24 : CONFIG.width * 0.76;
+  const x = side === 'left' ? CONFIG.width * 0.22 : CONFIG.width * 0.78;
   const y = CONFIG.height * 0.5;
   return {
     x,
     y,
     vx: 0,
     vy: 0,
-    lastX: x,
-    lastY: y,
-    lastMoveAt: Date.now()
+    lastInputAt: Date.now()
   };
 }
 
-function createState(roomId, leftSocket, rightSocket) {
+function createMatch(roomId, leftSocket, rightSocket) {
   return {
     roomId,
-    sockets: { left: leftSocket, right: rightSocket },
+    sockets: {
+      left: leftSocket,
+      right: rightSocket
+    },
     players: {
       left: {
         id: leftSocket.id,
         side: 'left',
-        mallet: makeMallet('left'),
-        character: 'Гоня',
-        connected: true
+        connected: true,
+        character: leftSocket.data.character || 'Гоня',
+        mallet: makeMallet('left')
       },
       right: {
         id: rightSocket.id,
         side: 'right',
-        mallet: makeMallet('right'),
-        character: 'Коржик',
-        connected: true
+        connected: true,
+        character: rightSocket.data.character || 'Коржик',
+        mallet: makeMallet('right')
       }
     },
     puck: {
       x: CONFIG.width / 2,
       y: CONFIG.height / 2,
       vx: 0,
-      vy: 0,
-      r: CONFIG.puckRadius
+      vy: 0
     },
-    score: { left: 0, right: 0 },
-    status: 'countdown',
+    score: {
+      left: 0,
+      right: 0
+    },
+    status: 'starting',
     winner: null,
     goalMessage: '',
-    roundEndsAt: Date.now() + 700,
-    lastTick: Date.now(),
+    lastTickAt: Date.now(),
     interval: null
   };
 }
 
-function resetMallets(state) {
-  state.players.left.mallet = makeMallet('left');
-  state.players.right.mallet = makeMallet('right');
+function leaveQueue(socket) {
+  if (waitingSocket && waitingSocket.id === socket.id) {
+    waitingSocket = null;
+  }
 }
 
-function resetPuck(state, towardSide = null) {
-  state.puck.x = CONFIG.width / 2;
-  state.puck.y = CONFIG.height / 2 + rand(-30, 30);
+function resetMallets(match) {
+  match.players.left.mallet = makeMallet('left');
+  match.players.right.mallet = makeMallet('right');
+}
+
+function resetPuck(match, towardSide = null) {
+  match.puck.x = CONFIG.width / 2;
+  match.puck.y = CONFIG.height / 2 + rand(-30, 30);
 
   const dir =
     towardSide === 'left'
@@ -113,172 +134,143 @@ function resetPuck(state, towardSide = null) {
       : towardSide === 'right'
       ? 1
       : Math.random() > 0.5
-      ? 1
-      : -1;
+        ? 1
+        : -1;
 
   const speed = rand(CONFIG.serveSpeedMin, CONFIG.serveSpeedMax);
-  state.puck.vx = dir * speed;
-  state.puck.vy = rand(-speed * 0.65, speed * 0.65);
+  match.puck.vx = dir * speed;
+  match.puck.vy = rand(-speed * 0.45, speed * 0.45);
 }
 
-function leaveWaiting(socket) {
-  if (waitingPlayer && waitingPlayer.id === socket.id) {
-    waitingPlayer = null;
-  }
-}
-
-function emitState(state, extra = {}) {
-  const payload = {
+function serializeMatch(match) {
+  return {
     config: CONFIG,
     state: {
       players: {
         left: {
-          id: state.players.left.id,
+          id: match.players.left.id,
           side: 'left',
-          x: state.players.left.mallet.x,
-          y: state.players.left.mallet.y,
-          vx: state.players.left.mallet.vx,
-          vy: state.players.left.mallet.vy,
-          character: state.players.left.character,
-          connected: state.players.left.connected
+          x: match.players.left.mallet.x,
+          y: match.players.left.mallet.y,
+          vx: match.players.left.mallet.vx,
+          vy: match.players.left.mallet.vy,
+          character: match.players.left.character,
+          connected: match.players.left.connected
         },
         right: {
-          id: state.players.right.id,
+          id: match.players.right.id,
           side: 'right',
-          x: state.players.right.mallet.x,
-          y: state.players.right.mallet.y,
-          vx: state.players.right.mallet.vx,
-          vy: state.players.right.mallet.vy,
-          character: state.players.right.character,
-          connected: state.players.right.connected
+          x: match.players.right.mallet.x,
+          y: match.players.right.mallet.y,
+          vx: match.players.right.mallet.vx,
+          vy: match.players.right.mallet.vy,
+          character: match.players.right.character,
+          connected: match.players.right.connected
         }
       },
       puck: {
-        x: state.puck.x,
-        y: state.puck.y,
-        vx: state.puck.vx,
-        vy: state.puck.vy
+        x: match.puck.x,
+        y: match.puck.y,
+        vx: match.puck.vx,
+        vy: match.puck.vy
       },
-      score: state.score,
-      status: state.status,
-      winner: state.winner,
-      goalMessage: state.goalMessage,
-      roomId: state.roomId,
-      roundEndsAt: state.roundEndsAt
-    },
-    ...extra
+      score: {
+        left: match.score.left,
+        right: match.score.right
+      },
+      status: match.status,
+      winner: match.winner,
+      goalMessage: match.goalMessage,
+      roomId: match.roomId
+    }
   };
-
-  io.to(state.roomId).emit('state', payload);
 }
 
-function startMatch(state) {
-  resetMallets(state);
-  resetPuck(state);
-  state.status = 'playing';
-  state.lastTick = Date.now();
-
-  state.interval = setInterval(() => {
-    const now = Date.now();
-    const dt = Math.min(0.033, (now - state.lastTick) / 1000);
-    state.lastTick = now;
-
-    stepState(state, dt);
-    emitState(state);
-  }, CONFIG.tickRate);
+function emitMatch(match, extra = {}) {
+  io.to(match.roomId).emit('state', {
+    ...serializeMatch(match),
+    ...extra
+  });
 }
 
-function collideMalletWithPuck(mallet, puck, boost = 1) {
+function constrainMalletToSide(mallet, side) {
+  const minX =
+    side === 'left'
+      ? CONFIG.malletRadius + 10
+      : CONFIG.width / 2 + CONFIG.malletRadius + 10;
+
+  const maxX =
+    side === 'left'
+      ? CONFIG.width / 2 - CONFIG.malletRadius - 10
+      : CONFIG.width - CONFIG.malletRadius - 10;
+
+  mallet.x = clamp(mallet.x, minX, maxX);
+  mallet.y = clamp(mallet.y, CONFIG.malletRadius + 10, CONFIG.height - CONFIG.malletRadius - 10);
+}
+
+function moveMalletFromInput(mallet, side, nextX, nextY) {
+  const now = Date.now();
+  const dt = Math.max(0.001, Math.min(0.05, (now - mallet.lastInputAt) / 1000));
+
+  const prevX = mallet.x;
+  const prevY = mallet.y;
+
+  mallet.x = nextX;
+  mallet.y = nextY;
+  constrainMalletToSide(mallet, side);
+
+  mallet.vx = (mallet.x - prevX) / dt;
+  mallet.vy = (mallet.y - prevY) / dt;
+  mallet.lastInputAt = now;
+}
+
+function decayMalletVelocity(mallet) {
+  mallet.vx *= 0.70;
+  mallet.vy *= 0.70;
+  if (Math.abs(mallet.vx) < 2) mallet.vx = 0;
+  if (Math.abs(mallet.vy) < 2) mallet.vy = 0;
+}
+
+function resolveMalletPuckCollision(mallet, puck) {
   const dx = puck.x - mallet.x;
   const dy = puck.y - mallet.y;
-  const dist = len(dx, dy);
-  const minDist = CONFIG.puckRadius + CONFIG.malletRadius;
+  const distance = Math.hypot(dx, dy);
+  const minDistance = CONFIG.malletRadius + CONFIG.puckRadius;
 
-  if (dist <= 0.0001 || dist >= minDist) return;
+  if (distance >= minDistance) return false;
 
-  const nx = dx / dist;
-  const ny = dy / dist;
-  const overlap = minDist - dist;
+  const n = distance === 0 ? { x: 1, y: 0 } : { x: dx / distance, y: dy / distance };
+  const overlap = minDistance - distance;
 
-  puck.x += nx * overlap;
-  puck.y += ny * overlap;
+  puck.x += n.x * overlap;
+  puck.y += n.y * overlap;
 
   const relVx = puck.vx - mallet.vx;
   const relVy = puck.vy - mallet.vy;
-  const sepSpeed = relVx * nx + relVy * ny;
+  const relNormal = relVx * n.x + relVy * n.y;
 
-  if (sepSpeed < 0) {
-    puck.vx -= 1.82 * sepSpeed * nx;
-    puck.vy -= 1.82 * sepSpeed * ny;
+  if (relNormal < 0) {
+    puck.vx -= 1.92 * relNormal * n.x;
+    puck.vy -= 1.92 * relNormal * n.y;
   }
 
-  const impact = Math.min(900, len(mallet.vx, mallet.vy)) * 0.38 * boost;
-  puck.vx += nx * impact;
-  puck.vy += ny * impact;
+  puck.vx += mallet.vx * 0.34 * CONFIG.malletBounce;
+  puck.vy += mallet.vy * 0.34 * CONFIG.malletBounce;
 
-  const speed = len(puck.vx, puck.vy);
-  if (speed > CONFIG.maxPuckSpeed) {
-    puck.vx = (puck.vx / speed) * CONFIG.maxPuckSpeed;
-    puck.vy = (puck.vy / speed) * CONFIG.maxPuckSpeed;
+  const currentSpeed = len(puck.vx, puck.vy);
+  if (currentSpeed > CONFIG.maxPuckSpeed) {
+    puck.vx = (puck.vx / currentSpeed) * CONFIG.maxPuckSpeed;
+    puck.vy = (puck.vy / currentSpeed) * CONFIG.maxPuckSpeed;
   }
+
+  return true;
 }
 
-function goalScored(state, scorerSide) {
-  state.score[scorerSide] += 1;
-  state.goalMessage = scorerSide === 'left' ? 'Гол слева!' : 'Гол справа!';
-  state.status = 'goal';
-  state.roundEndsAt = Date.now() + CONFIG.resetDelayMs;
-  state.puck.vx = 0;
-  state.puck.vy = 0;
-
-  if (state.score[scorerSide] >= CONFIG.maxScore) {
-    state.status = 'finished';
-    state.winner = scorerSide;
-    state.goalMessage =
-      scorerSide === 'left'
-        ? 'Левый игрок победил!'
-        : 'Правый игрок победил!';
-
-    clearInterval(state.interval);
-    state.interval = null;
-    emitState(state, { final: true });
-    return;
-  }
-
-  setTimeout(() => {
-    if (!matches.has(state.roomId)) return;
-    resetMallets(state);
-    resetPuck(state, scorerSide === 'left' ? 'right' : 'left');
-    state.status = 'playing';
-    state.goalMessage = '';
-  }, CONFIG.resetDelayMs);
-}
-
-function stepState(state, dt) {
-  if (state.status !== 'playing') return;
-
-  const puck = state.puck;
-
-  puck.x += puck.vx * dt;
-  puck.y += puck.vy * dt;
-
-  puck.vx *= Math.pow(CONFIG.puckFrictionPerFrame, dt * 60);
-  puck.vy *= Math.pow(CONFIG.puckFrictionPerFrame, dt * 60);
-
+function handleWallsAndGoals(match) {
+  const puck = match.puck;
   const goalTop = CONFIG.height / 2 - CONFIG.goalHeight / 2;
   const goalBottom = CONFIG.height / 2 + CONFIG.goalHeight / 2;
-  const inGoalMouth = puck.y > goalTop && puck.y < goalBottom;
-
-  if (!inGoalMouth) {
-    if (puck.x - CONFIG.puckRadius <= 0) {
-      puck.x = CONFIG.puckRadius;
-      puck.vx = Math.abs(puck.vx) * CONFIG.wallBounce;
-    }
-    if (puck.x + CONFIG.puckRadius >= CONFIG.width) {
-      puck.x = CONFIG.width - CONFIG.puckRadius;
-      puck.vx = -Math.abs(puck.vx) * CONFIG.wallBounce;
-    }
-  }
+  const insideGoal = puck.y > goalTop && puck.y < goalBottom;
 
   if (puck.y - CONFIG.puckRadius <= 0) {
     puck.y = CONFIG.puckRadius;
@@ -290,24 +282,118 @@ function stepState(state, dt) {
     puck.vy = -Math.abs(puck.vy) * CONFIG.wallBounce;
   }
 
-  collideMalletWithPuck(state.players.left.mallet, puck, 1.0);
-  collideMalletWithPuck(state.players.right.mallet, puck, 1.0);
+  if (!insideGoal) {
+    if (puck.x - CONFIG.puckRadius <= 0) {
+      puck.x = CONFIG.puckRadius;
+      puck.vx = Math.abs(puck.vx) * CONFIG.wallBounce;
+    }
 
-  if (puck.x + CONFIG.puckRadius < 0 && inGoalMouth) {
-    goalScored(state, 'right');
+    if (puck.x + CONFIG.puckRadius >= CONFIG.width) {
+      puck.x = CONFIG.width - CONFIG.puckRadius;
+      puck.vx = -Math.abs(puck.vx) * CONFIG.wallBounce;
+    }
+  }
+
+  if (puck.x + CONFIG.puckRadius < 0 && insideGoal) {
+    scoreGoal(match, 'right');
+    return true;
+  }
+
+  if (puck.x - CONFIG.puckRadius > CONFIG.width && insideGoal) {
+    scoreGoal(match, 'left');
+    return true;
+  }
+
+  return false;
+}
+
+function scoreGoal(match, scorerSide) {
+  match.score[scorerSide] += 1;
+  match.goalMessage = scorerSide === 'left' ? 'Гол слева!' : 'Гол справа!';
+  match.status = 'goal';
+  match.puck.vx = 0;
+  match.puck.vy = 0;
+
+  if (match.score[scorerSide] >= CONFIG.maxScore) {
+    match.status = 'finished';
+    match.winner = scorerSide;
+    match.goalMessage = scorerSide === 'left' ? 'Левый игрок победил!' : 'Правый игрок победил!';
+
+    if (match.interval) {
+      clearInterval(match.interval);
+      match.interval = null;
+    }
+
+    emitMatch(match, { final: true });
     return;
   }
 
-  if (puck.x - CONFIG.puckRadius > CONFIG.width && inGoalMouth) {
-    goalScored(state, 'left');
-    return;
+  setTimeout(() => {
+    if (!matches.has(match.roomId)) return;
+    resetMallets(match);
+    resetPuck(match, scorerSide === 'left' ? 'right' : 'left');
+    match.status = 'playing';
+    match.goalMessage = '';
+  }, CONFIG.resetDelayMs);
+}
+
+function stepMatch(match, dt) {
+  if (match.status !== 'playing') return;
+
+  decayMalletVelocity(match.players.left.mallet);
+  decayMalletVelocity(match.players.right.mallet);
+
+  const puck = match.puck;
+  const subDt = dt / CONFIG.collisionSubsteps;
+
+  for (let i = 0; i < CONFIG.collisionSubsteps; i += 1) {
+    puck.x += puck.vx * subDt;
+    puck.y += puck.vy * subDt;
+
+    resolveMalletPuckCollision(match.players.left.mallet, puck);
+    resolveMalletPuckCollision(match.players.right.mallet, puck);
+
+    if (handleWallsAndGoals(match)) return;
+  }
+
+  puck.vx *= CONFIG.friction;
+  puck.vy *= CONFIG.friction;
+
+  const speed = len(puck.vx, puck.vy);
+
+  if (speed > CONFIG.maxPuckSpeed) {
+    puck.vx = (puck.vx / speed) * CONFIG.maxPuckSpeed;
+    puck.vy = (puck.vy / speed) * CONFIG.maxPuckSpeed;
+  } else if (speed > 0 && speed < CONFIG.minPuckSpeed) {
+    puck.vx = (puck.vx / speed) * CONFIG.minPuckSpeed;
+    puck.vy = (puck.vy / speed) * CONFIG.minPuckSpeed;
   }
 }
 
+function startMatchLoop(match) {
+  resetMallets(match);
+  resetPuck(match);
+  match.status = 'playing';
+  match.lastTickAt = Date.now();
+
+  match.interval = setInterval(() => {
+    const now = Date.now();
+    const dt = Math.min(0.02, (now - match.lastTickAt) / 1000);
+    match.lastTickAt = now;
+
+    stepMatch(match, dt);
+    emitMatch(match);
+  }, CONFIG.tickRateMs);
+}
+
 function cleanupMatch(roomId) {
-  const state = matches.get(roomId);
-  if (!state) return;
-  if (state.interval) clearInterval(state.interval);
+  const match = matches.get(roomId);
+  if (!match) return;
+
+  if (match.interval) clearInterval(match.interval);
+
+  socketToRoom.delete(match.players.left.id);
+  socketToRoom.delete(match.players.right.id);
   matches.delete(roomId);
 }
 
@@ -315,113 +401,95 @@ io.on('connection', (socket) => {
   socket.emit('welcome', { socketId: socket.id });
 
   socket.on('findMatch', ({ character }) => {
-    leaveWaiting(socket);
+    leaveQueue(socket);
     socket.data.character = character || 'Гоня';
 
-    if (waitingPlayer && waitingPlayer.id !== socket.id && waitingPlayer.connected) {
+    if (waitingSocket && waitingSocket.id !== socket.id && waitingSocket.connected) {
       const roomId = `room_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      const leftSocket = waitingPlayer;
+      const leftSocket = waitingSocket;
       const rightSocket = socket;
 
       leftSocket.join(roomId);
       rightSocket.join(roomId);
 
-      const state = createState(roomId, leftSocket, rightSocket);
-      state.players.left.character = leftSocket.data.character || 'Гоня';
-      state.players.right.character = rightSocket.data.character || 'Коржик';
+      const match = createMatch(roomId, leftSocket, rightSocket);
+      matches.set(roomId, match);
+      socketToRoom.set(leftSocket.id, roomId);
+      socketToRoom.set(rightSocket.id, roomId);
 
-      matches.set(roomId, state);
-      socketToMatch.set(leftSocket.id, roomId);
-      socketToMatch.set(rightSocket.id, roomId);
-      waitingPlayer = null;
+      waitingSocket = null;
 
       io.to(leftSocket.id).emit('matchFound', {
         side: 'left',
         roomId,
-        opponent: state.players.right.character
+        opponent: match.players.right.character
       });
 
       io.to(rightSocket.id).emit('matchFound', {
         side: 'right',
         roomId,
-        opponent: state.players.left.character
+        opponent: match.players.left.character
       });
 
-      startMatch(state);
+      startMatchLoop(match);
     } else {
-      waitingPlayer = socket;
+      waitingSocket = socket;
       socket.emit('queue', { message: 'Ищем соперника...' });
     }
   });
 
   socket.on('move', ({ x, y }) => {
-    const roomId = socketToMatch.get(socket.id);
+    const roomId = socketToRoom.get(socket.id);
     if (!roomId) return;
 
-    const state = matches.get(roomId);
-    if (!state || state.status !== 'playing') return;
+    const match = matches.get(roomId);
+    if (!match || match.status !== 'playing') return;
 
     const side =
-      state.players.left.id === socket.id
+      match.players.left.id === socket.id
         ? 'left'
-        : state.players.right.id === socket.id
-        ? 'right'
-        : null;
+        : match.players.right.id === socket.id
+          ? 'right'
+          : null;
 
     if (!side) return;
 
-    const mallet = state.players[side].mallet;
-
+    const mallet = match.players[side].mallet;
     const minX =
       side === 'left'
-        ? CONFIG.malletRadius + 8
+        ? CONFIG.malletRadius + 10
         : CONFIG.width / 2 + CONFIG.malletRadius + 10;
 
     const maxX =
       side === 'left'
         ? CONFIG.width / 2 - CONFIG.malletRadius - 10
-        : CONFIG.width - CONFIG.malletRadius - 8;
+        : CONFIG.width - CONFIG.malletRadius - 10;
 
-    const nx = clamp(Number(x) || 0, minX, maxX);
-    const ny = clamp(
-      Number(y) || 0,
-      CONFIG.malletRadius + 8,
-      CONFIG.height - CONFIG.malletRadius - 8
-    );
+    const nextX = clamp(Number(x) || 0, minX, maxX);
+    const nextY = clamp(Number(y) || 0, CONFIG.malletRadius + 10, CONFIG.height - CONFIG.malletRadius - 10);
 
-    const now = Date.now();
-    const dt = Math.max(0.001, Math.min(0.05, (now - mallet.lastMoveAt) / 1000));
-
-    mallet.vx = (nx - mallet.x) / dt;
-    mallet.vy = (ny - mallet.y) / dt;
-    mallet.lastMoveAt = now;
-
-    mallet.lastX = mallet.x;
-    mallet.lastY = mallet.y;
-    mallet.x = nx;
-    mallet.y = ny;
+    moveMalletFromInput(mallet, side, nextX, nextY);
   });
 
   socket.on('disconnect', () => {
-    leaveWaiting(socket);
+    leaveQueue(socket);
 
-    const roomId = socketToMatch.get(socket.id);
+    const roomId = socketToRoom.get(socket.id);
     if (!roomId) return;
 
-    const state = matches.get(roomId);
-    if (!state) return;
+    const match = matches.get(roomId);
+    if (!match) return;
 
-    const side = state.players.left.id === socket.id ? 'left' : 'right';
-    state.players[side].connected = false;
+    const side = match.players.left.id === socket.id ? 'left' : 'right';
+    match.players[side].connected = false;
+
     const otherSide = side === 'left' ? 'right' : 'left';
-    const otherSocket = state.sockets[otherSide];
+    const otherSocket = match.sockets[otherSide];
 
     if (otherSocket && otherSocket.connected) {
       io.to(otherSocket.id).emit('opponentLeft');
     }
 
-    socketToMatch.delete(state.players.left.id);
-    socketToMatch.delete(state.players.right.id);
     cleanupMatch(roomId);
   });
 });
