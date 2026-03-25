@@ -10,15 +10,21 @@
   <style>
     :root {
       --bg1: #0f172a;
-      --panel: rgba(15, 23, 42, 0.82);
-      --line: rgba(255,255,255,0.22);
+      --bg2: #1e293b;
+      --panel: rgba(15, 23, 42, 0.90);
+      --line: rgba(255,255,255,0.18);
       --text: #f8fafc;
       --muted: #cbd5e1;
       --accent: #f59e0b;
-      --red: #ef4444;
+      --accent2: #ef4444;
+      --card: rgba(255,255,255,0.06);
+      --cardBorder: rgba(255,255,255,0.10);
     }
 
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
 
     html, body {
       margin: 0;
@@ -26,14 +32,13 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: radial-gradient(circle at top, #1e3a8a 0%, var(--bg1) 42%, #020617 100%);
+      background: radial-gradient(circle at top, #1d4ed8 0%, #0f172a 38%, #020617 100%);
       color: var(--text);
       font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
     body {
       overscroll-behavior: none;
-      -webkit-tap-highlight-color: transparent;
     }
 
     #app {
@@ -49,49 +54,57 @@
       width: 100%;
       height: 100%;
       display: block;
-      touch-action: none;
       z-index: 1;
+      touch-action: none;
+    }
+
+    .hidden {
+      display: none !important;
     }
 
     .overlay {
       position: absolute;
       inset: 0;
+      z-index: 30;
+      background: linear-gradient(180deg, rgba(2, 6, 23, 0.58), rgba(2, 6, 23, 0.92));
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      padding:
+        max(14px, env(safe-area-inset-top))
+        14px
+        max(18px, env(safe-area-inset-bottom))
+        14px;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 16px;
-      background: linear-gradient(180deg, rgba(2,6,23,0.68), rgba(2,6,23,0.90));
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      z-index: 20;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
     }
-
-    .hidden { display: none !important; }
 
     .panel {
       width: min(980px, 100%);
       background: var(--panel);
-      border: 1px solid rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.10);
       border-radius: 24px;
-      box-shadow: 0 30px 80px rgba(0,0,0,0.35);
+      box-shadow: 0 30px 80px rgba(0,0,0,0.32);
       padding: 18px;
     }
 
     .title {
-      font-size: clamp(28px, 4vw, 46px);
+      font-size: clamp(28px, 6vw, 50px);
       font-weight: 900;
       text-align: center;
-      margin-bottom: 8px;
+      line-height: 1.04;
+      margin: 0 0 8px;
     }
 
     .subtitle {
       text-align: center;
       color: var(--muted);
-      margin-bottom: 16px;
-      font-size: clamp(14px, 2vw, 18px);
+      font-size: clamp(14px, 3.5vw, 18px);
       line-height: 1.35;
+      margin: 0 0 16px;
     }
 
     .stats {
@@ -102,61 +115,64 @@
     }
 
     .stat {
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.10);
-      border-radius: 18px;
-      padding: 12px;
+      background: var(--card);
+      border: 1px solid var(--cardBorder);
+      border-radius: 16px;
+      padding: 12px 10px;
       text-align: center;
     }
 
-    .stat .label {
+    .label {
       color: var(--muted);
       font-size: 12px;
       margin-bottom: 4px;
     }
 
-    .stat .value {
-      font-weight: 800;
-      font-size: clamp(20px, 3vw, 30px);
+    .value {
+      font-size: clamp(18px, 5vw, 28px);
+      font-weight: 900;
+      line-height: 1.1;
     }
 
     .character-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 12px;
-      margin-bottom: 16px;
+      gap: 10px;
     }
 
     .character {
-      border-radius: 20px;
-      border: 2px solid rgba(255,255,255,0.10);
+      border-radius: 18px;
+      border: 2px solid rgba(255,255,255,0.08);
       background: rgba(255,255,255,0.05);
-      padding: 12px;
+      padding: 10px;
       cursor: pointer;
-      transition: transform .12s ease, border-color .12s ease, background .12s ease;
       user-select: none;
-      color: white;
+      transition: transform .12s ease, border-color .12s ease, background .12s ease;
+      color: #fff;
+      appearance: none;
     }
 
-    .character:active { transform: scale(0.98); }
+    .character:active {
+      transform: scale(.985);
+    }
 
     .character.selected {
       border-color: var(--accent);
-      background: rgba(245, 158, 11, 0.12);
-      box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.10) inset;
+      background: rgba(245,158,11,0.13);
+      box-shadow: 0 0 0 3px rgba(245,158,11,0.12) inset;
     }
 
     .avatar {
       width: 100%;
       aspect-ratio: 1 / 1;
-      border-radius: 18px;
+      border-radius: 16px;
       display: flex;
       align-items: center;
       justify-content: center;
+      font-size: clamp(22px, 7vw, 34px);
       font-weight: 900;
-      font-size: clamp(24px, 3vw, 34px);
-      margin-bottom: 8px;
       color: #fff;
+      margin-bottom: 8px;
       text-shadow: 0 2px 8px rgba(0,0,0,0.22);
       pointer-events: none;
     }
@@ -169,7 +185,8 @@
     .char-name {
       text-align: center;
       font-weight: 800;
-      font-size: 17px;
+      font-size: 16px;
+      line-height: 1.15;
       pointer-events: none;
     }
 
@@ -177,6 +194,7 @@
       text-align: center;
       color: var(--muted);
       font-size: 12px;
+      line-height: 1.2;
       margin-top: 4px;
       pointer-events: none;
     }
@@ -186,26 +204,29 @@
       gap: 10px;
       justify-content: center;
       flex-wrap: wrap;
-      margin-top: 14px;
+      margin-top: 16px;
     }
 
     button {
       appearance: none;
       border: none;
       border-radius: 16px;
-      padding: 14px 20px;
+      padding: 14px 18px;
+      min-height: 52px;
       font-size: 17px;
       font-weight: 900;
-      cursor: pointer;
       color: #fff;
+      cursor: pointer;
+      touch-action: manipulation;
       background: none;
-      min-height: 52px;
     }
 
-    button:active { transform: scale(0.99); }
+    button:active {
+      transform: scale(.99);
+    }
 
     .primary {
-      background: linear-gradient(135deg, #f59e0b, #ef4444);
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
       min-width: 190px;
     }
 
@@ -217,14 +238,14 @@
 
     .hud {
       position: absolute;
-      top: max(6px, env(safe-area-inset-top));
       left: 50%;
       transform: translateX(-50%);
+      top: max(6px, env(safe-area-inset-top));
       width: min(900px, calc(100% - 10px));
       z-index: 8;
       display: flex;
-      justify-content: space-between;
       gap: 6px;
+      justify-content: space-between;
       pointer-events: none;
     }
 
@@ -233,16 +254,16 @@
       border: 1px solid rgba(255,255,255,0.08);
       border-radius: 12px;
       padding: 6px 8px;
+      min-width: 0;
       backdrop-filter: blur(6px);
       -webkit-backdrop-filter: blur(6px);
-      min-width: 0;
     }
 
     .hud-main {
       flex: 1;
       display: flex;
-      justify-content: center;
       align-items: center;
+      justify-content: center;
       gap: 8px;
       min-width: 0;
     }
@@ -263,25 +284,10 @@
     }
 
     .score {
-      font-size: clamp(18px, 4.5vw, 28px);
+      font-size: clamp(18px, 4.6vw, 28px);
       font-weight: 900;
       line-height: 1;
       min-width: 62px;
-      text-align: center;
-    }
-
-    .toast {
-      position: absolute;
-      left: 50%;
-      bottom: max(12px, env(safe-area-inset-bottom));
-      transform: translateX(-50%);
-      background: rgba(2,6,23,0.82);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 999px;
-      padding: 10px 14px;
-      font-weight: 800;
-      z-index: 12;
-      max-width: 92vw;
       text-align: center;
     }
 
@@ -289,43 +295,76 @@
       position: absolute;
       left: 50%;
       top: 50%;
-      transform: translate(-50%,-50%);
-      background: rgba(2,6,23,0.74);
+      transform: translate(-50%, -50%);
+      z-index: 10;
+      background: rgba(2,6,23,0.78);
       border: 1px solid rgba(255,255,255,0.12);
       border-radius: 18px;
-      padding: 12px 16px;
+      padding: 14px 18px;
       font-weight: 900;
-      font-size: clamp(18px, 4vw, 28px);
-      z-index: 10;
+      font-size: clamp(18px, 5vw, 28px);
       text-align: center;
-      max-width: 90vw;
+      max-width: min(92vw, 520px);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      pointer-events: none;
+    }
+
+    .toast {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: max(14px, env(safe-area-inset-bottom));
+      z-index: 12;
+      background: rgba(2,6,23,0.82);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 999px;
+      padding: 11px 16px;
+      font-size: 14px;
+      font-weight: 800;
+      text-align: center;
+      max-width: 92vw;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      pointer-events: none;
     }
 
     .hint {
       position: absolute;
       left: 50%;
-      bottom: max(50px, calc(env(safe-area-inset-bottom) + 28px));
       transform: translateX(-50%);
-      background: rgba(2,6,23,0.52);
+      bottom: max(54px, calc(env(safe-area-inset-bottom) + 28px));
+      z-index: 7;
+      background: rgba(2,6,23,0.48);
       border: 1px solid rgba(255,255,255,0.08);
       border-radius: 999px;
-      padding: 8px 10px;
-      font-size: 11px;
+      padding: 8px 12px;
+      font-size: 12px;
       color: var(--muted);
-      z-index: 7;
-      max-width: 94vw;
       text-align: center;
+      max-width: 94vw;
       pointer-events: none;
     }
 
     @media (max-width: 860px) {
-      .character-grid { grid-template-columns: repeat(2, 1fr); }
+      .character-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .panel {
+        padding: 16px;
+      }
     }
 
     @media (max-width: 560px) {
-      .stats { grid-template-columns: 1fr; }
-      .actions { flex-direction: column; }
-      .primary, .secondary { width: 100%; }
+      .stats {
+        grid-template-columns: 1fr;
+      }
+      .primary, .secondary {
+        width: 100%;
+      }
+      .actions {
+        flex-direction: column;
+      }
     }
 
     @media (max-height: 500px) and (orientation: landscape) {
@@ -340,22 +379,28 @@
         border-radius: 10px;
       }
 
-      .small { font-size: 9px; }
-      .big { font-size: 11px; }
+      .small {
+        font-size: 9px;
+      }
+
+      .big {
+        font-size: 11px;
+      }
+
       .score {
         font-size: 18px;
         min-width: 52px;
       }
 
+      .hint {
+        bottom: max(36px, calc(env(safe-area-inset-bottom) + 8px));
+        font-size: 10px;
+        padding: 6px 8px;
+      }
+
       .center-note {
         font-size: 18px;
         padding: 10px 12px;
-      }
-
-      .hint {
-        bottom: max(34px, calc(env(safe-area-inset-bottom) + 10px));
-        font-size: 10px;
-        padding: 6px 8px;
       }
     }
   </style>
@@ -393,8 +438,10 @@
 
   <div class="overlay" id="menu">
     <div class="panel">
-      <div class="title">3 Кота: Онлайн Аэрохоккей</div>
-      <div class="subtitle">Быстрый матч 1 на 1. Выбирай персонажа, жми кнопку и жди второго игрока.</div>
+      <h1 class="title">3 Кота: Онлайн Аэрохоккей</h1>
+      <p class="subtitle">
+        Выбирай персонажа, нажимай кнопку и жди соперника. Когда второй игрок зайдёт — матч стартует автоматически.
+      </p>
 
       <div class="stats">
         <div class="stat">
@@ -422,8 +469,8 @@
 
   <div class="overlay hidden" id="resultOverlay">
     <div class="panel" style="max-width:680px">
-      <div class="title" id="resultTitle">Матч окончен</div>
-      <div class="subtitle" id="resultSub">Подсчёт награды…</div>
+      <h2 class="title" id="resultTitle">Матч окончен</h2>
+      <p class="subtitle" id="resultSub">Подсчёт награды…</p>
 
       <div class="stats">
         <div class="stat">
@@ -480,7 +527,7 @@
   const againBtn = document.getElementById('againBtn');
   const menuBtn = document.getElementById('menuBtn');
 
-  const STORAGE_KEY = 'three_cats_online_progress_v5';
+  const STORAGE_KEY = 'three_cats_online_progress_final_v1';
 
   const characters = [
     { name: 'Гоня', role: 'Быстрый старт', cls: 'c1', short: 'Г' },
@@ -494,21 +541,20 @@
 
   let mySide = null;
   let gameState = null;
-  let gameFinishedHandled = false;
-
   let config = {
-    width: 1280,
-    height: 720,
-    goalHeight: 210,
-    malletRadius: 48,
-    puckRadius: 22
+    width: 1200,
+    height: 700,
+    goalHeight: 230,
+    malletRadius: 62,
+    puckRadius: 28
   };
 
   let localMallet = null;
   let remoteMallet = null;
   let pointerActive = false;
+  let gameFinishedHandled = false;
   let rafId = null;
-  let lastFrame = performance.now();
+  let lastTime = performance.now();
 
   const socket = io({
     transports: ['websocket', 'polling']
@@ -518,8 +564,12 @@
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) return JSON.parse(raw);
-    } catch {}
-    return { elo: 1000, matches: 0, character: 'Гоня' };
+    } catch (e) {}
+    return {
+      elo: 1000,
+      matches: 0,
+      character: 'Гоня'
+    };
   }
 
   function saveProgress() {
@@ -541,30 +591,32 @@
     const grid = document.getElementById('characterGrid');
     grid.innerHTML = '';
 
-    characters.forEach(char => {
-      const el = document.createElement('button');
-      el.type = 'button';
-      el.className = 'character' + (selectedCharacter === char.name ? ' selected' : '');
-      el.innerHTML = `
+    characters.forEach((char) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'character' + (selectedCharacter === char.name ? ' selected' : '');
+      btn.innerHTML = `
         <div class="avatar ${char.cls}">${char.short}</div>
         <div class="char-name">${char.name}</div>
         <div class="char-role">${char.role}</div>
       `;
-      el.onclick = () => {
+      btn.onclick = () => {
         selectedCharacter = char.name;
         saveProgress();
         renderCharacters();
         showToast('Выбран: ' + char.name, 900);
       };
-      grid.appendChild(el);
+      grid.appendChild(btn);
     });
   }
 
-  function showToast(text, time = 1800) {
+  function showToast(text, ms = 1800) {
     toast.textContent = text;
     toast.classList.remove('hidden');
-    clearTimeout(showToast._t);
-    showToast._t = setTimeout(() => toast.classList.add('hidden'), time);
+    clearTimeout(showToast._timer);
+    showToast._timer = setTimeout(() => {
+      toast.classList.add('hidden');
+    }, ms);
   }
 
   function showCenter(text) {
@@ -585,72 +637,73 @@
     hint.classList.add('hidden');
   }
 
-  function clamp(v, a, b) {
-    return Math.max(a, Math.min(b, v));
-  }
-
-  function len(x, y) {
-    return Math.hypot(x, y);
+  function clamp(v, min, max) {
+    return Math.max(min, Math.min(max, v));
   }
 
   function resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.floor(window.innerWidth * dpr);
-    canvas.height = Math.floor(window.innerHeight * dpr);
+    canvas.width = Math.max(1, Math.floor(window.innerWidth * dpr));
+    canvas.height = Math.max(1, Math.floor(window.innerHeight * dpr));
     canvas.style.width = window.innerWidth + 'px';
     canvas.style.height = window.innerHeight + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
-  function scaleX(x) {
+  function sx(x) {
     return (x / config.width) * window.innerWidth;
   }
 
-  function scaleY(y) {
+  function sy(y) {
     return (y / config.height) * window.innerHeight;
   }
 
-  function screenToWorldX(x) {
+  function wx(x) {
     return (x / window.innerWidth) * config.width;
   }
 
-  function screenToWorldY(y) {
+  function wy(y) {
     return (y / window.innerHeight) * config.height;
   }
 
-  function worldRadius(r) {
-    const sx = window.innerWidth / config.width;
-    const sy = window.innerHeight / config.height;
-    return r * Math.min(sx, sy);
+  function wr(r) {
+    const scale = Math.min(window.innerWidth / config.width, window.innerHeight / config.height);
+    return r * scale;
   }
 
-  function constrainLocalTarget(x, y) {
-    let nx = screenToWorldX(x);
-    let ny = screenToWorldY(y);
+  function constrainToMyHalf(worldX, worldY) {
+    let x = worldX;
+    let y = worldY;
 
     if (mySide === 'left') {
-      nx = clamp(nx, config.malletRadius + 8, config.width / 2 - config.malletRadius - 10);
+      x = clamp(x, config.malletRadius + 10, config.width / 2 - config.malletRadius - 10);
     } else {
-      nx = clamp(nx, config.width / 2 + config.malletRadius + 10, config.width - config.malletRadius - 8);
+      x = clamp(x, config.width / 2 + config.malletRadius + 10, config.width - config.malletRadius - 10);
     }
 
-    ny = clamp(ny, config.malletRadius + 8, config.height - config.malletRadius - 8);
-
-    return { x: nx, y: ny };
+    y = clamp(y, config.malletRadius + 10, config.height - config.malletRadius - 10);
+    return { x, y };
   }
 
   function pushPointer(clientX, clientY) {
     if (!mySide) return;
-    const p = constrainLocalTarget(clientX, clientY);
+
+    const p = constrainToMyHalf(wx(clientX), wy(clientY));
 
     if (!localMallet) {
-      localMallet = { x: p.x, y: p.y, vx: 0, vy: 0, tx: p.x, ty: p.y };
+      localMallet = {
+        x: p.x,
+        y: p.y,
+        tx: p.x,
+        ty: p.y,
+        character: selectedCharacter
+      };
     }
 
-    localMallet.tx = p.x;
-    localMallet.ty = p.y;
     localMallet.x = p.x;
     localMallet.y = p.y;
+    localMallet.tx = p.x;
+    localMallet.ty = p.y;
 
     socket.emit('move', { x: p.x, y: p.y });
   }
@@ -669,8 +722,13 @@
       e.preventDefault();
     }, { passive: false });
 
-    window.addEventListener('pointerup', () => pointerActive = false);
-    window.addEventListener('pointercancel', () => pointerActive = false);
+    window.addEventListener('pointerup', () => {
+      pointerActive = false;
+    });
+
+    window.addEventListener('pointercancel', () => {
+      pointerActive = false;
+    });
   }
 
   function drawRoundedRect(x, y, w, h, r) {
@@ -686,25 +744,27 @@
   function drawArena() {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    const goalTop = scaleY(config.height / 2 - config.goalHeight / 2);
-    const goalBottom = scaleY(config.height / 2 + config.goalHeight / 2);
-    const centerX = scaleX(config.width / 2);
+    const pad = Math.max(8, Math.min(16, w * 0.02));
+    const radius = Math.max(16, Math.min(28, w * 0.03));
 
     ctx.clearRect(0, 0, w, h);
 
     const bg = ctx.createLinearGradient(0, 0, w, h);
     bg.addColorStop(0, '#0b1220');
-    bg.addColorStop(1, '#0f1f3d');
+    bg.addColorStop(1, '#102345');
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, w, h);
 
-    const pad = Math.max(8, Math.min(16, w * 0.02));
-    drawRoundedRect(pad, pad, w - pad * 2, h - pad * 2, 24);
+    drawRoundedRect(pad, pad, w - pad * 2, h - pad * 2, radius);
     ctx.fillStyle = 'rgba(255,255,255,0.03)';
     ctx.fill();
     ctx.lineWidth = 3;
-    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.14)';
     ctx.stroke();
+
+    const centerX = sx(config.width / 2);
+    const goalTop = sy(config.height / 2 - config.goalHeight / 2);
+    const goalBottom = sy(config.height / 2 + config.goalHeight / 2);
 
     ctx.save();
     ctx.fillStyle = 'rgba(255,255,255,0.035)';
@@ -724,7 +784,7 @@
     ctx.arc(centerX, h / 2, Math.min(w, h) * 0.12, 0, Math.PI * 2);
     ctx.stroke();
 
-    ctx.strokeStyle = 'rgba(245,158,11,0.65)';
+    ctx.strokeStyle = 'rgba(245,158,11,0.60)';
     ctx.lineWidth = 5;
     ctx.beginPath();
     ctx.moveTo(pad, goalTop);
@@ -735,11 +795,10 @@
     ctx.moveTo(w - pad, goalTop);
     ctx.lineTo(w - pad, goalBottom);
     ctx.stroke();
-
     ctx.restore();
   }
 
-  function malletLook(character) {
+  function malletStyle(character) {
     const map = {
       'Гоня': ['#fb7185', '#f59e0b', 'Г'],
       'Карамелька': ['#f472b6', '#60a5fa', 'К'],
@@ -752,14 +811,14 @@
   function drawMallet(player, mine) {
     if (!player) return;
 
-    const x = scaleX(player.x);
-    const y = scaleY(player.y);
-    const r = worldRadius(config.malletRadius);
+    const x = sx(player.x);
+    const y = sy(player.y);
+    const r = wr(config.malletRadius);
 
-    const [a, b, letter] = malletLook(player.character);
+    const [c1, c2, letter] = malletStyle(player.character);
     const grad = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
-    grad.addColorStop(0, a);
-    grad.addColorStop(1, b);
+    grad.addColorStop(0, c1);
+    grad.addColorStop(1, c2);
 
     ctx.save();
     ctx.beginPath();
@@ -787,9 +846,9 @@
   function drawPuck(puck) {
     if (!puck) return;
 
-    const x = scaleX(puck.x);
-    const y = scaleY(puck.y);
-    const r = worldRadius(config.puckRadius);
+    const x = sx(puck.x);
+    const y = sy(puck.y);
+    const r = wr(config.puckRadius);
 
     ctx.save();
 
@@ -819,31 +878,30 @@
     ctx.restore();
   }
 
-  function drawWaiting() {
+  function drawWaitingText() {
     ctx.save();
     ctx.fillStyle = 'rgba(255,255,255,0.16)';
-    ctx.font = '900 24px system-ui';
     ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '900 24px system-ui';
     ctx.fillText('Нажми "Играть онлайн"', window.innerWidth / 2, window.innerHeight / 2 - 16);
     ctx.font = '700 14px system-ui';
     ctx.fillStyle = 'rgba(255,255,255,0.12)';
-    ctx.fillText('и дождись соперника', window.innerWidth / 2, window.innerHeight / 2 + 14);
+    ctx.fillText('и дождись соперника', window.innerWidth / 2, window.innerHeight / 2 + 16);
     ctx.restore();
   }
 
   function updateVisualMallets(dt) {
-    if (!gameState || !gameState.players) return;
+    if (!gameState || !gameState.players || !mySide) return;
 
-    const mine = mySide ? gameState.players[mySide] : null;
-    const enemy = mySide ? gameState.players[mySide === 'left' ? 'right' : 'left'] : null;
+    const mine = gameState.players[mySide];
+    const enemy = gameState.players[mySide === 'left' ? 'right' : 'left'];
 
     if (mine) {
       if (!localMallet) {
         localMallet = {
           x: mine.x,
           y: mine.y,
-          vx: 0,
-          vy: 0,
           tx: mine.x,
           ty: mine.y,
           character: mine.character
@@ -879,9 +937,9 @@
     }
   }
 
-  function frame(now) {
-    const dt = Math.min(0.033, (now - lastFrame) / 1000);
-    lastFrame = now;
+  function renderFrame(now) {
+    const dt = Math.min(0.033, (now - lastTime) / 1000);
+    lastTime = now;
 
     drawArena();
 
@@ -889,21 +947,41 @@
       updateVisualMallets(dt);
 
       const leftPlayer = mySide === 'left'
-        ? { ...gameState.players.left, x: localMallet?.x ?? gameState.players.left.x, y: localMallet?.y ?? gameState.players.left.y, character: localMallet?.character ?? gameState.players.left.character }
-        : { ...gameState.players.left, x: remoteMallet?.x ?? gameState.players.left.x, y: remoteMallet?.y ?? gameState.players.left.y, character: remoteMallet?.character ?? gameState.players.left.character };
+        ? {
+            ...gameState.players.left,
+            x: localMallet ? localMallet.x : gameState.players.left.x,
+            y: localMallet ? localMallet.y : gameState.players.left.y,
+            character: localMallet ? localMallet.character : gameState.players.left.character
+          }
+        : {
+            ...gameState.players.left,
+            x: remoteMallet ? remoteMallet.x : gameState.players.left.x,
+            y: remoteMallet ? remoteMallet.y : gameState.players.left.y,
+            character: remoteMallet ? remoteMallet.character : gameState.players.left.character
+          };
 
       const rightPlayer = mySide === 'right'
-        ? { ...gameState.players.right, x: localMallet?.x ?? gameState.players.right.x, y: localMallet?.y ?? gameState.players.right.y, character: localMallet?.character ?? gameState.players.right.character }
-        : { ...gameState.players.right, x: remoteMallet?.x ?? gameState.players.right.x, y: remoteMallet?.y ?? gameState.players.right.y, character: remoteMallet?.character ?? gameState.players.right.character };
+        ? {
+            ...gameState.players.right,
+            x: localMallet ? localMallet.x : gameState.players.right.x,
+            y: localMallet ? localMallet.y : gameState.players.right.y,
+            character: localMallet ? localMallet.character : gameState.players.right.character
+          }
+        : {
+            ...gameState.players.right,
+            x: remoteMallet ? remoteMallet.x : gameState.players.right.x,
+            y: remoteMallet ? remoteMallet.y : gameState.players.right.y,
+            character: remoteMallet ? remoteMallet.character : gameState.players.right.character
+          };
 
       drawMallet(leftPlayer, mySide === 'left');
       drawMallet(rightPlayer, mySide === 'right');
       drawPuck(gameState.puck);
     } else {
-      drawWaiting();
+      drawWaitingText();
     }
 
-    rafId = requestAnimationFrame(frame);
+    rafId = requestAnimationFrame(renderFrame);
   }
 
   function startQueue() {
@@ -927,9 +1005,9 @@
     remoteMallet = null;
     gameFinishedHandled = false;
     statusText.textContent = 'Меню';
-    scoreText.textContent = '0 : 0';
     youName.textContent = '—';
     enemyName.textContent = '—';
+    scoreText.textContent = '0 : 0';
   }
 
   function resetProgress() {
@@ -971,6 +1049,9 @@
     showHint('Веди пальцем по своей половине поля');
     showToast('Соперник найден');
 
+    resultOverlay.classList.add('hidden');
+    menu.classList.add('hidden');
+
     statusText.textContent = mySide === 'left' ? 'Ты слева' : 'Ты справа';
     youName.textContent = selectedCharacter + (mySide === 'left' ? ' • слева' : ' • справа');
     enemyName.textContent = payload.opponent || 'Игрок';
@@ -981,10 +1062,11 @@
 
     config = payload.config || config;
     gameState = payload.state || gameState;
-
     if (!gameState) return;
 
-    scoreText.textContent = `${gameState.score.left} : ${gameState.score.right}`;
+    if (gameState.score) {
+      scoreText.textContent = `${gameState.score.left} : ${gameState.score.right}`;
+    }
 
     if (gameState.status === 'playing') {
       statusText.textContent = 'Матч идёт';
@@ -1042,8 +1124,8 @@
 
   if (rafId) cancelAnimationFrame(rafId);
   requestAnimationFrame((t) => {
-    lastFrame = t;
-    frame(t);
+    lastTime = t;
+    renderFrame(t);
   });
 })();
 </script>
