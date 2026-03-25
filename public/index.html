@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+  />
+  <title>3 Кота: Онлайн Аэрохоккей</title>
+  <style>
+    :root{
+      --panel:rgba(15,23,42,.94);
+      --text:#f8fafc;
+      --muted:#cbd5e1;
+      --accent:#f59e0b;
+      --accent2:#ef4444;
+      --card:rgba(255,255,255,.06);
+      --cardBorder:rgba(255,255,255,.10);
+    }
+
+    *{
+      box-sizing:border-box;
+      -webkit-tap-highlight-color:transparent;
+    }
+
+    html, body {
+      margin:0;
+      padding:0;
+      width:100%;
+      height:100%;
+      overflow:hidden;
+      background:radial-gradient(circle at top, #1d4ed8 0%, #0f172a 38%, #020617 100%);
+      color:var(--text);
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+    }
+
+    body{
+      overscroll-behavior:none;
+    }
+
+    #app{
+      position:relative;
+      width:100vw;
+      height:100vh;
+      overflow:hidden;
+    }
+
+    canvas{
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      display:block;
+      z-index:1;
+      touch-action:none;
+    }
+
+    .hidden{
+      display:none !important;
+    }
+
+    .overlay{
+      position:absolute;
+      inset:0;
+      z-index:30;
+      background:linear-gradient(180deg, rgba(2,6,23,.55), rgba(2,6,23,.90));
+      backdrop-filter:blur(8px);
+      -webkit-backdrop-filter:blur(8px);
+      overflow-y:auto;
+      overflow-x:hidden;
+      -webkit-overflow-scrolling:touch;
+      padding:
+        max(14px, env(safe-area-inset-top))
+        14px
+        max(18px, env(safe-area-inset-bottom))
+        14px;
+      pointer-events:auto;
+      touch-action:auto;
+    }
+
+    .overlay-inner{
+      min-height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      pointer-events:none;
+    }
+
+    .panel{
+      width:min(980px, 100%);
+      background:var(--panel);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:22px;
+      box-shadow:0 20px 70px rgba(0,0,0,.35);
+      padding:18px;
+      margin:auto;
+      pointer-events:auto;
+      touch-action:auto;
+    }
+
+    .title{
+      font-size:clamp(28px, 7vw, 50px);
+      font-weight:900;
+      text-align:center;
+      line-height:1.02;
+      margin:0 0 8px;
+    }
+
+    .subtitle{
+      text-align:center;
+      color:var(--muted);
+      font-size:clamp(14px, 3.3vw, 18px);
+      line-height:1.35;
+      margin:0 0 16px;
+    }
+
+    .stats{
+      display:grid;
+      grid-template-columns:repeat(3, 1fr);
+      gap:10px;
+      margin-bottom:14px;
+    }
+
+    .stat{
+      background:var(--card);
+      border:1px solid var(--cardBorder);
+      border-radius:16px;
+      padding:12px 10px;
+      text-align:center;
+    }
+
+    .label{
+      color:var(--muted);
+      font-size:12px;
+      margin-bottom:4px;
+    }
+
+    .value{
+      font-size:clamp(18px, 5vw, 28px);
+      font-weight:900;
+      line-height:1.1;
+    }
+
+    .section-title{
+      font-weight:900;
+      font-size:18px;
+      margin:4px 0 10px;
+      text-align:center;
+    }
+
+    .character-grid{
+      display:grid;
+      grid-template-columns:repeat(4, 1fr);
+      gap:10px;
+    }
+
+    .character{
+      border-radius:18px;
+      border:2px solid rgba(255,255,255,.08);
+      background:rgba(255,255,255,.05);
+      padding:10px;
+      cursor:pointer;
+      user-select:none;
+      transition:.12s transform ease, .12s border-color ease, .12s background ease;
+      pointer-events:auto;
+      touch-action:manipulation;
+      color:#fff;
+    }
+
+    .character:active{
+      transform:scale(.985);
+    }
+
+    .character.selected{
+      border-color:var(--accent);
+      background:rgba(245,158,11,.13);
+      box-shadow:0 0 0 3px rgba(245,158,11,.12) inset;
+    }
+
+    .avatar{
+      width:100%;
+      aspect-ratio:1/1;
+      border-radius:16px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:clamp(22px, 7vw, 34px);
+      font-weight:900;
+      color:#fff;
+      margin-bottom:8px;
+      text-shadow:0 2px 8px rgba(0,0,0,.22);
+      pointer-events:none;
+    }
+
+    .c1{background:linear-gradient(135deg,#fb7185,#f59e0b)}
+    .c2{background:linear-gradient(135deg,#f472b6,#60a5fa)}
+    .c3{background:linear-gradient(135deg,#f59e0b,#ef4444)}
+    .c4{background:linear-gradient(135deg,#34d399,#3b82f6)}
+
+    .char-name{
+      text-align:center;
+      font-weight:800;
+      font-size:16px;
+      line-height:1.15;
+      pointer-events:none;
+    }
+
+    .char-role{
+      text-align:center;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.2;
+      margin-top:4px;
+      pointer-events:none;
+    }
+
+    .actions{
+      display:flex;
+      gap:10px;
+      justify-content:center;
+      flex-wrap:wrap;
+      margin-top:16px;
+      position:sticky;
+      bottom:0;
+      padding-top:8px;
+      background:linear-gradient(180deg, rgba(15,23,42,0), rgba(15,23,42,.92) 35%);
+      z-index:2;
+      pointer-events:auto;
+    }
+
+    button{
+      appearance:none;
+      border:none;
+      border-radius:16px;
+      padding:14px 18px;
+      min-height:52px;
+      font-size:17px;
+      font-weight:900;
+      color:#fff;
+      cursor:pointer;
+      pointer-events:auto;
+      touch-action:manipulation;
+      background:none;
+    }
+
+    button:active{
+      transform:scale(.99);
+    }
+
+    .primary{
+      background:linear-gradient(135deg, var(--accent), var(--accent2));
+      min-width:190px;
+    }
+
+    .secondary{
+      background:rgba(255,255,255,.10);
+      border:1px solid rgba(255,255,255,.10);
+      min-width:160px;
+    }
+
+    .hud{
+      position:absolute;
+      left:50%;
+      transform:translateX(-50%);
+      top:max(6px, env(safe-area-inset-top));
+      width:min(860px, calc(100% - 10px));
+      z-index:8;
+      display:flex;
+      gap:6px;
+      justify-content:space-between;
+      pointer-events:none;
+    }
+
+    .hud-box{
+      background:rgba(2,6,23,.56);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:12px;
+      padding:6px 8px;
+      min-width:0;
+      backdrop-filter:blur(6px);
+      -webkit-backdrop-filter:blur(6px);
+    }
+
+    .hud-main{
+      flex:1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      min-width:0;
+    }
+
+    .small{
+      font-size:10px;
+      color:var(--muted);
+      line-height:1.05;
+    }
+
+    .big{
+      font-size:clamp(11px, 2.8vw, 16px);
+      font-weight:800;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      line-height:1.15;
+    }
+
+    .score{
+      font-size:clamp(18px, 4.6vw, 28px);
+      font-weight:900;
+      line-height:1;
+      min-width:62px;
+      text-align:center;
+    }
+
+    .center-note{
+      position:absolute;
+      left:50%;
+      top:50%;
+      transform:translate(-50%, -50%);
+      z-index:10;
+      background:rgba(2,6,23,.78);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:18px;
+      padding:14px 18px;
+      font-weight:900;
+      font-size:clamp(18px, 5vw, 28px);
+      text-align:center;
+      max-width:min(92vw, 520px);
+      backdrop-filter:blur(8px);
+      -webkit-backdrop-filter:blur(8px);
+      pointer-events:none;
+    }
+
+    .toast{
+      position:absolute;
+      left:50%;
+      transform:translateX(-50%);
+      bottom:max(14px, env(safe-area-inset-bottom));
+      z-index:12;
+      background:rgba(2,6,23,.82);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:999px;
+      padding:11px 16px;
+      font-size:14px;
+      font-weight:800;
+      text-align:center;
+      max-width:92vw;
+      backdrop-filter:blur(8px);
+      -webkit-backdrop-filter:blur(8px);
+      pointer-events:none;
+    }
+
+    .hint{
+      position:absolute;
+      left:50%;
+      transform:translateX(-50%);
+      bottom:max(58px, calc(env(safe-area-inset-bottom) + 44px));
+      z-index:7;
+      background:rgba(2,6,23,.48);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:999px;
+      padding:8px 12px;
+      font-size:12px;
+      color:var(--muted);
+      text-align:center;
+      max-width:94vw;
+      pointer-events:none;
+    }
+
+    @media (max-width: 860px){
+      .character-grid{
+        grid-template-columns:repeat(2, 1fr);
+      }
+      .panel{
+        padding:16px;
+        border-radius:20px;
+      }
+    }
+
+    @media (max-width: 560px){
+      .stats{
+        grid-template-columns:1fr;
+      }
+      .hud{
+        width:calc(100% - 8px);
+        gap:6px;
+      }
+      .hud-box{
+        padding:8px 8px;
+        border-radius:14px;
+      }
+      .hud-main{
+        gap:6px;
+      }
+      .primary, .secondary{
+        width:100%;
+      }
+      .actions{
+        flex-direction:column;
+      }
+    }
+
+    @media (max-height: 500px) and (orientation: landscape){
+      .hud{
+        top:max(4px, env(safe-area-inset-top));
+        width:calc(100% - 8px);
+        gap:4px;
+      }
+
+      .hud-box{
+        padding:4px 6px;
+        border-radius:10px;
+      }
+
+      .small{
+        font-size:9px;
+      }
+
+      .big{
+        font-size:11px;
+      }
+
+      .score{
+        font-size:18px;
+        min-width:52px;
+      }
+
+      .hint{
+        bottom:max(40px, calc(env(safe-area-inset-bottom) + 18px));
+        font-size:11px;
+        padding:6px 10px;
+      }
+
+      .center-note{
+        font-size:18px;
+        padding:10px 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <canvas id="game"></canvas>
+
+  <div class="hud">
+    <div class="hud-box">
+      <div class="small">Ты</div>
+      <div class="big" id="youName">—</div>
+    </div>
+
+    <div class="hud-box hud-main">
+      <div>
+        <div class="small">Счёт</div>
+        <div class="score" id="scoreText">0 : 0</div>
+      </div>
+      <div>
+        <div class="small">Статус</div>
+        <div class="big" id="statusText">Меню</div>
+      </div>
+    </div>
+
+    <div class="hud-box" style="text-align:right">
+      <div class="small">Соперник</div>
+      <div class="big" id="enemyName">—</div>
+    </div>
+  </div>
+
+  <div id="centerNote" class="center-note hidden"></div>
+  <div id="toast" class="toast hidden"></div>
+  <div id="hint" class="hint hidden">Веди пальцем по своей половине поля</div>
+
+  <div class="overlay" id="menu">
+    <div class="overlay-inner">
+      <div class="panel">
+        <h1 class="title">3 Кота: Онлайн Аэрохоккей</h1>
+        <p class="subtitle">
+          Выбирай персонажа, нажимай кнопку и жди соперника. Когда второй игрок зайдёт — матч начнётся автоматически.
+        </p>
+
+        <div class="stats">
+          <div class="stat">
+            <div class="label">ЭЛО</div>
+            <div class="value" id="eloValue">1000</div>
+          </div>
+          <div class="stat">
+            <div class="label">Уровень</div>
+            <div class="value" id="levelValue">1</div>
+          </div>
+          <div class="stat">
+            <div class="label">Матчей</div>
+            <div class="value" id="matchesValue">0</div>
+          </div>
+        </div>
+
+        <div class="section-title">Выбери персонажа</div>
+        <div class="character-grid" id="characterGrid"></div>
+
+        <div class="actions">
+          <button class="primary" id="findBtn" type="button">Играть онлайн</button>
+          <button class="secondary" id="resetBtn" type="button">Сбросить прогресс</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="resultOverlay">
+    <div class="overlay-inner">
+      <div class="panel" style="max-width:680px">
+        <h2 class="title" id="resultTitle">Матч окончен</h2>
+        <p class="subtitle" id="resultSub">Подсчёт награды…</p>
+
+        <div class="stats">
+          <div class="stat">
+            <div class="label">Награда</div>
+            <div class="value" id="gainValue">+0</div>
+          </div>
+          <div class="stat">
+            <div class="label">Твоя ЭЛО</div>
+            <div class="value" id="newEloValue">1000</div>
+          </div>
+          <div class="stat">
+            <div class="label">Уровень</div>
+            <div class="value" id="newLevelValue">1</div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="primary" id="againBtn" type="button">Новый матч</button>
+          <button class="secondary" id="menuBtn" type="button">В меню</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+
+  const menu = document.getElementById('menu');
+  const resultOverlay = document.getElementById('resultOverlay');
+  const centerNote = document.getElementById('centerNote');
+  const toast = document.getElementById('toast');
+  const hint = document.getElementById('hint');
+
+  const scoreText = document.getElementById('scoreText');
+  const statusText = document.getElementById('statusText');
+  const youName = document.getElementById('youName');
+  const enemyName = document.getElementById('enemyName');
+
+  const eloValue = document.getElementById('eloValue');
+  const levelValue = document.getElementById('levelValue');
+  const matchesValue = document.getElementById('matchesValue');
+
+  const gainValue = document.getElementById('gainValue');
+  const newEloValue = document.getElementById('newEloValue');
+  const newLevelValue = document.getElementById('newLevelValue');
+  const resultTitle = document.getElementById('resultTitle');
+  const resultSub = document.getElementById('resultSub');
+
+  const findBtn = document.getElementById('findBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const againBtn = document.getElementById('againBtn');
+  const menuBtn = document.getElementById('menuBtn');
+
+  const STORAGE_KEY = 'three_cats_online_progress_v4';
+
+  const characters = [
+    { name: 'Гоня', role: 'Быстрый старт', cls: 'c1', short: 'Г' },
+    { name: 'Карамелька', role: 'Точный удар', cls: 'c2', short: 'К' },
+    { name: 'Коржик', role: 'Сильный напор', cls: 'c3', short: 'К' },
+    { name: 'Компот', role: 'Спокойный контроль', cls: 'c4', short: 'К' }
+  ];
+
+  let progress = loadProgress();
+  let selectedCharacter = progress.character || 'Гоня';
+
+  let mySide = null;
+  let roomId = null;
+  let gameState = null;
+  let gameFinishedHandled = false;
+
+  let config = {
+    width: 1280,
+    height: 720,
+    goalHeight: 220,
+    malletRadius: 36,
+    puckRadius: 16
+  };
+
+  let pointerActive = false;
+  let rafId = null;
+
+  const socket = io({
+    transports: ['websocket', 'polling']
+  });
+
+  function loadProgress() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return { elo: 1000, matches: 0, character: 'Гоня' };
+  }
+
+  function saveProgress() {
+    progress.character = selectedCharacter;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+  }
+
+  function getLevel(elo) {
+    return Math.floor(Math.max(0, elo - 1000) / 1000) + 1;
+  }
+
+  function renderMenuStats() {
+    eloValue.textContent = progress.elo;
+    levelValue.textContent = getLevel(progress.elo);
+    matchesValue.textContent = progress.matches;
+  }
+
+  function renderCharacters() {
+    const grid = document.getElementById('characterGrid');
+    grid.innerHTML = '';
+
+    characters.forEach(char => {
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'character' + (selectedCharacter === char.name ? ' selected' : '');
+      el.innerHTML = `
+        <div class="avatar ${char.cls}">${char.short}</div>
+        <div class="char-name">${char.name}</div>
+        <div class="char-role">${char.role}</div>
+      `;
+      el.addEventListener('click', () => {
+        selectedCharacter = char.name;
+        saveProgress();
+        renderCharacters();
+        showToast('Выбран: ' + char.name, 900);
+      });
+      grid.appendChild(el);
+    });
+  }
+
+  function showToast(text, ms = 1800) {
+    toast.textContent = text;
+    toast.classList.remove('hidden');
+    clearTimeout(showToast._timer);
+    showToast._timer = setTimeout(() => {
+      toast.classList.add('hidden');
+    }, ms);
+  }
+
+  function showCenter(text) {
+    centerNote.textContent = text;
+    centerNote.classList.remove('hidden');
+  }
+
+  function hideCenter() {
+    centerNote.classList.add('hidden');
+  }
+
+  function showHint(text) {
+    hint.textContent = text;
+    hint.classList.remove('hidden');
+  }
+
+  function hideHint() {
+    hint.classList.add('hidden');
+  }
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.max(1, Math.floor(window.innerWidth * dpr));
+    canvas.height = Math.max(1, Math.floor(window.innerHeight * dpr));
+    canvas.style.width = window.innerWidth + 'px';
+    canvas.style.height = window.innerHeight + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function scaleX(x) {
+    return (x / config.width) * window.innerWidth;
+  }
+
+  function scaleY(y) {
+    return (y / config.height) * window.innerHeight;
+  }
+
+  function screenToWorldX(x) {
+    return (x / window.innerWidth) * config.width;
+  }
+
+  function screenToWorldY(y) {
+    return (y / window.innerHeight) * config.height;
+  }
+
+  function worldRadius(r) {
+    const sx = window.innerWidth / config.width;
+    const sy = window.innerHeight / config.height;
+    return r * Math.min(sx, sy);
+  }
+
+  function clamp(v, min, max) {
+    return Math.max(min, Math.min(max, v));
+  }
+
+  function sendPointer(clientX, clientY) {
+    if (!mySide) return;
+
+    let x = screenToWorldX(clientX);
+    let y = screenToWorldY(clientY);
+
+    if (mySide === 'left') {
+      x = clamp(x, config.malletRadius + 12, config.width / 2 - config.malletRadius - 8);
+    } else {
+      x = clamp(x, config.width / 2 + config.malletRadius + 8, config.width - config.malletRadius - 12);
+    }
+
+    y = clamp(y, config.malletRadius + 12, config.height - config.malletRadius - 12);
+
+    socket.emit('move', { x, y });
+  }
+
+  function setupInput() {
+    canvas.addEventListener('pointerdown', (e) => {
+      if (!mySide) return;
+      pointerActive = true;
+      sendPointer(e.clientX, e.clientY);
+      e.preventDefault();
+    }, { passive: false });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if (!pointerActive || !mySide) return;
+      sendPointer(e.clientX, e.clientY);
+      e.preventDefault();
+    }, { passive: false });
+
+    window.addEventListener('pointerup', () => {
+      pointerActive = false;
+    });
+
+    window.addEventListener('pointercancel', () => {
+      pointerActive = false;
+    });
+  }
+
+  function drawRoundedRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawField() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const pad = Math.max(8, Math.min(16, w * 0.02));
+    const radius = Math.max(16, Math.min(28, w * 0.03));
+
+    ctx.clearRect(0, 0, w, h);
+
+    ctx.save();
+    drawRoundedRect(pad, pad, w - pad * 2, h - pad * 2, radius);
+    ctx.fillStyle = 'rgba(15,23,42,0.32)';
+    ctx.fill();
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+    ctx.stroke();
+    ctx.restore();
+
+    const midX = scaleX(config.width / 2);
+    const goalTop = scaleY(config.height / 2 - config.goalHeight / 2);
+    const goalBottom = scaleY(config.height / 2 + config.goalHeight / 2);
+
+    ctx.save();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.035)';
+    ctx.fillRect(pad, pad, midX - pad, h - pad * 2);
+    ctx.fillRect(midX, pad, w - pad - midX, h - pad * 2);
+
+    ctx.setLineDash([10, 10]);
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(midX, pad);
+    ctx.lineTo(midX, h - pad);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.beginPath();
+    ctx.arc(midX, h / 2, Math.min(w, h) * 0.11, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(245,158,11,0.58)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(pad, goalTop);
+    ctx.lineTo(pad, goalBottom);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(w - pad, goalTop);
+    ctx.lineTo(w - pad, goalBottom);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  function malletStyle(character) {
+    const map = {
+      'Гоня': ['#fb7185', '#f59e0b', 'Г'],
+      'Карамелька': ['#f472b6', '#60a5fa', 'К'],
+      'Коржик': ['#f59e0b', '#ef4444', 'К'],
+      'Компот': ['#34d399', '#3b82f6', 'К']
+    };
+    return map[character] || ['#f59e0b', '#ef4444', '?'];
+  }
+
+  function drawMallet(player, mine) {
+    if (!player) return;
+
+    const x = scaleX(player.x);
+    const y = scaleY(player.y);
+    const r = worldRadius(config.malletRadius);
+
+    const [c1, c2, letter] = malletStyle(player.character);
+    const grad = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
+    grad.addColorStop(0, c1);
+    grad.addColorStop(1, c2);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.lineWidth = mine ? 4 : 2.5;
+    ctx.strokeStyle = mine ? 'rgba(255,255,255,0.96)' : 'rgba(255,255,255,0.56)';
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.46, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.16)';
+    ctx.fill();
+
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `900 ${Math.max(14, r * 0.9)}px -apple-system, BlinkMacSystemFont, sans-serif`;
+    ctx.fillText(letter, x, y + 1);
+    ctx.restore();
+  }
+
+  function drawPuck(puck) {
+    if (!puck) return;
+
+    const x = scaleX(puck.x);
+    const y = scaleY(puck.y);
+    const r = worldRadius(config.puckRadius);
+
+    ctx.save();
+
+    ctx.beginPath();
+    ctx.ellipse(x, y + r * 0.42, r * 0.95, r * 0.42, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    ctx.fill();
+
+    const grad = ctx.createLinearGradient(x, y - r, x, y + r);
+    grad.addColorStop(0, '#2b3442');
+    grad.addColorStop(1, '#0b1220');
+
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.lineWidth = Math.max(1.5, r * 0.12);
+    ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(x - r * 0.28, y - r * 0.28, r * 0.22, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  function drawWaitingText() {
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.16)';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '900 22px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillText('Нажми "Играть онлайн"', window.innerWidth / 2, window.innerHeight / 2 - 16);
+    ctx.font = '700 14px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.fillText('и дождись соперника', window.innerWidth / 2, window.innerHeight / 2 + 16);
+    ctx.restore();
+  }
+
+  function renderFrame() {
+    drawField();
+
+    if (gameState && gameState.players && gameState.puck) {
+      drawMallet(gameState.players.left, mySide === 'left');
+      drawMallet(gameState.players.right, mySide === 'right');
+      drawPuck(gameState.puck);
+    } else {
+      drawWaitingText();
+    }
+
+    rafId = requestAnimationFrame(renderFrame);
+  }
+
+  function startQueue() {
+    resultOverlay.classList.add('hidden');
+    menu.classList.add('hidden');
+    gameFinishedHandled = false;
+    showCenter('Ищем соперника…');
+    showHint('Как только второй игрок зайдёт, матч начнётся');
+    statusText.textContent = 'Поиск матча';
+    socket.emit('findMatch', { character: selectedCharacter });
+  }
+
+  function resetProgress() {
+    progress = { elo: 1000, matches: 0, character: selectedCharacter };
+    saveProgress();
+    renderMenuStats();
+    showToast('Прогресс сброшен');
+  }
+
+  function backToMenu() {
+    resultOverlay.classList.add('hidden');
+    menu.classList.remove('hidden');
+    hideCenter();
+    hideHint();
+    mySide = null;
+    roomId = null;
+    gameState = null;
+    gameFinishedHandled = false;
+    statusText.textContent = 'Меню';
+    youName.textContent = '—';
+    enemyName.textContent = '—';
+    scoreText.textContent = '0 : 0';
+  }
+
+  findBtn.onclick = startQueue;
+  resetBtn.onclick = resetProgress;
+  againBtn.onclick = startQueue;
+  menuBtn.onclick = backToMenu;
+
+  socket.on('connect', () => {
+    showToast('Соединение установлено');
+  });
+
+  socket.on('disconnect', () => {
+    showCenter('Нет соединения с сервером');
+    hideHint();
+    statusText.textContent = 'Оффлайн';
+  });
+
+  socket.on('queue', () => {
+    menu.classList.add('hidden');
+    showCenter('Ищем соперника…');
+    showHint('Открой ссылку у друга или во второй вкладке');
+    statusText.textContent = 'Поиск матча';
+  });
+
+  socket.on('matchFound', (payload) => {
+    mySide = payload.side;
+    roomId = payload.roomId;
+    gameFinishedHandled = false;
+
+    hideCenter();
+    showHint('Веди пальцем по своей половине поля');
+    showToast('Соперник найден');
+
+    resultOverlay.classList.add('hidden');
+    menu.classList.add('hidden');
+
+    statusText.textContent = mySide === 'left' ? 'Ты слева' : 'Ты справа';
+    youName.textContent = selectedCharacter + (mySide === 'left' ? ' • слева' : ' • справа');
+    enemyName.textContent = payload.opponent || 'Игрок';
+  });
+
+  socket.on('state', (payload) => {
+    if (!payload) return;
+
+    config = payload.config || config;
+    gameState = payload.state || gameState;
+
+    if (!gameState) return;
+
+    if (gameState.score) {
+      scoreText.textContent = `${gameState.score.left} : ${gameState.score.right}`;
+    }
+
+    if (gameState.status === 'playing') {
+      statusText.textContent = 'Матч идёт';
+      hideCenter();
+      showHint('Веди пальцем по своей половине поля');
+    } else if (gameState.status === 'goal') {
+      statusText.textContent = 'Гол';
+      showCenter(gameState.goalMessage || 'Гол!');
+      showHint('Сейчас продолжим');
+    } else if (gameState.status === 'finished') {
+      statusText.textContent = 'Матч окончен';
+      hideCenter();
+      hideHint();
+
+      if (!gameFinishedHandled) {
+        gameFinishedHandled = true;
+        const gain = Math.floor(Math.random() * 301) + 300;
+        const myWon = gameState.winner === mySide;
+
+        progress.elo += gain;
+        progress.matches += 1;
+        saveProgress();
+        renderMenuStats();
+
+        gainValue.textContent = `+${gain}`;
+        newEloValue.textContent = progress.elo;
+        newLevelValue.textContent = getLevel(progress.elo);
+        resultTitle.textContent = myWon ? 'Победа!' : 'Матч окончен';
+        resultSub.textContent = myWon
+          ? 'Хорошая катка. ЭЛО уже начислено.'
+          : 'Катка завершена. ЭЛО уже начислено.';
+      }
+
+      resultOverlay.classList.remove('hidden');
+    }
+  });
+
+  socket.on('opponentLeft', () => {
+    showCenter('Соперник вышел');
+    hideHint();
+    statusText.textContent = 'Соперник вышел';
+    showToast('Соперник отключился');
+
+    setTimeout(() => {
+      backToMenu();
+      hideCenter();
+    }, 1300);
+  });
+
+  renderCharacters();
+  renderMenuStats();
+  resize();
+  setupInput();
+  window.addEventListener('resize', resize);
+
+  if (rafId) cancelAnimationFrame(rafId);
+  renderFrame();
+})();
+</script>
+</body>
+</html>
